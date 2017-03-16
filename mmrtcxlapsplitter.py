@@ -28,6 +28,7 @@ class TcxSplitSingleLap:
 
         self._splitresKM = kwargs.get('split_res_KM', 1.0)
         self._progress = kwargs.get('progbar')
+        self._pbarlabel = kwargs.get('pbarlabel')
 
     def getlinecount(self):
         _f = open(self._filename, 'rb')
@@ -46,6 +47,14 @@ class TcxSplitSingleLap:
             self.progbarpercent = IntVar()
             self.progbarpercent.set(0)
             self._progress.config(variable=self.progbarpercent)
+
+            if self._pbarlabel is None:
+                pass
+            else:
+                global label_percent
+                label_percent = StringVar()
+                label_percent.set("0.0%")
+                self._pbarlabel.config(textvariable=label_percent)
 
             self.secondary_thread = threading.Thread(
                 target=self._callparseline)
@@ -69,6 +78,8 @@ class TcxSplitSingleLap:
             else:  # continue from the try suite
 
                 self.progbarpercent.set(progbar_per)
+                label_percent.set('{:.1f}%'.format(actual_per))
+#                print(actual_per)
 
 #                print("DEQUEUED! {}".format(self.progbarpercent.get()))
                 # if x == 4:
@@ -165,10 +176,11 @@ def SelectFile():
 
             global progressbar
             global lap_res
-
+            global pbar_label
             mmrSplit = TcxSplitSingleLap(file=filename,
                                          split_res_KM=lap_res.get(),
-                                         progbar=progressbar)
+                                         progbar=progressbar,
+                                         pbarlabel=pbar_label)
             # mmrSplit = TcxSplitSingleLap(file=filename,
             #                              split_res_KM=lap_res.get())
 
@@ -242,8 +254,14 @@ def main():
 
     global progressbar
     progressbar = ttk.Progressbar(frameProgressBar, orient=HORIZONTAL,
-                                  mode='determinate', maximum=100)
-    progressbar.pack(padx=10, pady=(0, 10), expand=True, fill='x')
+                                  mode='determinate', maximum=100, length=305)
+    #progressbar.pack(side=LEFT, padx=10, pady=(0, 10), expand=True, fill='x')
+    progressbar.grid(column=0, row=0, sticky='w', padx=(10, 5), pady=(0, 10))
+    
+    global pbar_label    
+    pbar_label = ttk.Label(frameProgressBar, text="{:.1f}%".format(0.0))
+    pbar_label.grid(column=1, row=0, padx=(0, 5), pady=(0, 10), sticky='e')
+
 
     global que
     que = queue.Queue()
