@@ -43,32 +43,34 @@ class TcxSplitSingleLap:
             _f.close()
         else:
             self.maxval = float(self.getlinecount())
-            self.linecnt = DoubleVar()
-            self.linecnt.set(0)
-            self._progress.config(maximum=self.maxval, variable=self.linecnt)
+            self.progbarpercent = IntVar()
+            self.progbarpercent.set(0)
+            self._progress.config(variable=self.progbarpercent)
 
             self.secondary_thread = threading.Thread(
                 target=self._callparseline)
             self.secondary_thread.start()
-            # check the Queue in 50ms
+            # check the Queue in 1ms
             global root
-            root.after(50, self._check_que)
+            root.after(1, self._check_que)
 
     def _check_que(self):
         while True:
             global que
             try:
-                x = que.get_nowait()
+                progbar_per, actual_per = que.get_nowait()
             except queue.Empty:
                 if self.secondary_thread.is_alive() is True:
+                    # if queue is empty, wait for another 1ms.
                     global root
-                    root.after(50, self._check_que)
-                    print("Empty queue.. waiting another 50ms")
+                    root.after(1, self._check_que)
+#                   print("Empty queue.. waiting another 50ms")
                 break
             else:  # continue from the try suite
-#                    self.label['text'] = '{}/4'.format(x)
-                self.linecnt.set(x)
-                print("DEQUEUED! {}".format(self.linecnt.get()))
+
+                self.progbarpercent.set(progbar_per)
+
+#                print("DEQUEUED! {}".format(self.progbarpercent.get()))
                 # if x == 4:
                 #     self.b_start['state'] = 'normal'
                 #     break
@@ -81,31 +83,35 @@ class TcxSplitSingleLap:
 
     def _callparseline(self):
         _f = open(self._filename)
-        ParseLineInFile(_f, self._splitresKM, self.linecnt, self.maxval)
+        ParseLineInFile(_f, self._splitresKM, self.progbarpercent, self.maxval)
         # ParseLineInFile(_f, self._splitresKM)
         _f.close()
 
 
+# arg[0] = line count, arg[1] = max lines in file
 def ParseLineInFile(file, splitresKM, *args):
     foundDistance = False
     track = False
     lapcount = 1
-    linetracker = 0.0
+    linetracker = 0   # tracks the number of lines within the file
+
+    # tracks if the same percent integer value has been calculated
+    lastpercent = 0
 
     global que
 
     print('Lap {} -->'.format(lapcount), end=" ")
     for line in file:
+
+        # Perform enclosed operations only if progress bar is present
         if len(args):
             linetracker += 1
             percent = (linetracker / args[1]) * 100
-            args[0].set(linetracker)
-            # global progressbar
-            # progressbar.update_idletasks()
 
-            if int(linetracker) % 10000 == 0:
-                print("mod 1000 line count = {} queue={}".format(linetracker, que))
-                que.put(linetracker)
+            # Update queue only if the integer percent value has changed
+            if lastpercent != int(percent):
+                lastpercent = int(percent)
+                que.put((lastpercent, percent))
 
         if(foundDistance):
             line = line.strip()
@@ -115,7 +121,8 @@ def ParseLineInFile(file, splitresKM, *args):
                 print('Lap {} -->'.format(lapcount), end=" ")
 
             if len(args):
-                print(line.strip(), end=" {} {:.1f}%\n".format(
+                print(line.strip(), end=" ")
+                print("progress = {}% actual progress = {:.1f}%".format(
                     args[0].get(), percent))
             else:
                 print(line.strip())
@@ -127,8 +134,10 @@ def ParseLineInFile(file, splitresKM, *args):
         if(line.find('<DistanceMeters>') >= 0 and track):
             foundDistance = True
 
-    que.put(linetracker)
-    print("loop done... line count={} queue={}".format(linetracker, que))
+    que.put((int(percent), percent))
+#    print("loop done... line count={} queue={} percent ={}%".format(
+#        linetracker, que, percent))
+
 
 def EntryAfterIdleCallback():
         global entry
@@ -233,8 +242,7 @@ def main():
 
     global progressbar
     progressbar = ttk.Progressbar(frameProgressBar, orient=HORIZONTAL,
-                                  mode='determinate')
-    #progressbar = ttk.Progressbar(mode='indeterminate')
+                                  mode='determinate', maximum=100)
     progressbar.pack(padx=10, pady=(0, 10), expand=True, fill='x')
 
     global que
