@@ -4,6 +4,9 @@
 # rebuilds the file to contain more than 1 lap.
 # Copyright 2017 ChanSoft, LLC
 
+import threading
+import queue
+
 from tkinter import *
 from tkinter import ttk
 from tkinter import filedialog
@@ -34,54 +37,46 @@ class TcxSplitSingleLap:
         return count
 
     def parseline(self):
-        _f = open(self._filename)
-
         if self._progress is None:
             pass
         else:
-            maxval = float(self.getlinecount())
-            linecnt = DoubleVar()
-            linecnt.set(0)
-            self._progress.config(maximum=maxval, variable=linecnt)
+            self.maxval = float(self.getlinecount())
+            self.linecnt = DoubleVar()
+            self.linecnt.set(0)
+            self._progress.config(maximum=self.maxval, variable=self.linecnt)
 
-        #ParseLineInFile(_f, self._splitresKM, linecnt, maxval)
-        ParseLineInFile(_f, self._splitresKM)
-#         foundDistance = False
-#         track = False
-#         lapcount = 1
+            self.secondary_thread = threading.Thread(target=self._callparseline)
+            self.secondary_thread.start()
+            # check the Queue in 50ms
+            self.after(1, self._check_que)
 
-#         print('Lap {} -->'.format(lapcount), end=" ")
-#         for line in _f:
 
-#             if self._progress is None:
-#                 pass
-#             else:
-#                 linetracker += 1
-#                 percent = (linetracker / maxval) * 100
-#                 linecnt.set(linetracker)
-# #                self._progress.update_idletasks()
-
-#             if(foundDistance):
-#                 line = line.strip()
-
-#                 if(float(line) >= float(lapcount) * (self._splitresKM * 1000)):
-#                     lapcount += 1
-#                     print('Lap {} -->'.format(lapcount), end=" ")
-#                 print(line.strip(), end=" {} {:.1f}%\n".format(float(linetracker), percent))
-#                 foundDistance = False
-
-#             if(line.find('<Track>') >= 0):
-#                 track = True
-
-#             if(line.find('<DistanceMeters>') >= 0 and track):
-#                 foundDistance = True
-        _f.close()
+    def _check_que(self):
+            while True:
+                global que
+                try:
+                    x = que.get_nowait()
+                except queue.Empty:
+                    self.after(1, self.check_que)
+                    break
+                else:  # continue from the try suite
+#                    self.label['text'] = '{}/4'.format(x)
+                    self.linecnt.set(x)
+                    # if x == 4:
+                    #     self.b_start['state'] = 'normal'
+                    #     break
 
     def _make_gen(self, reader):
         _b = reader(1024 * 1024)
         while _b:
             yield _b
             _b = reader(1024 * 1024)
+
+    def _callparseline(self):
+        _f = open(self._filename)
+        ParseLineInFile(_f, self._splitresKM, self.linecnt, self.maxval)
+        # ParseLineInFile(_f, self._splitresKM)
+        _f.close()
 
 
 def ParseLineInFile(file, splitresKM, *args):
@@ -109,6 +104,9 @@ def ParseLineInFile(file, splitresKM, *args):
             if len(args):
                 print(line.strip(), end=" {} {:.1f}%\n".format(
                     args[0].get(), percent))
+
+                global que
+                que.put(linetracker)
             else:
                 print(line.strip())
             foundDistance = False
@@ -220,6 +218,9 @@ def main():
                                   mode='determinate')
     #progressbar = ttk.Progressbar(mode='indeterminate')
     progressbar.pack(padx=10, pady=(0, 10), expand=True, fill='x')
+
+    global que
+    que = queue.Queue()
 
     root.mainloop()
 
