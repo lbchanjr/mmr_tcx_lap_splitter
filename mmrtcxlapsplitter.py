@@ -24,6 +24,7 @@ class TcxSplitSingleLap:
                             "the 'file=<filename>' option.")
 
         self._splitresKM = kwargs.get('split_res_KM', 1.0)
+        self._progress = kwargs.get('progbar')
 
     def getlinecount(self):
         _f = open(self._filename, 'rb')
@@ -35,26 +36,45 @@ class TcxSplitSingleLap:
     def parseline(self):
         _f = open(self._filename)
 
-        foundDistance = False
-        track = False
-        lapcount = 1
-        print('Lap {} -->'.format(lapcount), end=" ")
-        for line in _f:
+        if self._progress is None:
+            pass
+        else:
+            maxval = float(self.getlinecount())
+            linecnt = DoubleVar()
+            linecnt.set(0)
+            self._progress.config(maximum=maxval, variable=linecnt)
 
-            if(foundDistance):
-                line = line.strip()
+        #ParseLineInFile(_f, self._splitresKM, linecnt, maxval)
+        ParseLineInFile(_f, self._splitresKM)
+#         foundDistance = False
+#         track = False
+#         lapcount = 1
 
-                if(float(line) >= float(lapcount) * (self._splitresKM * 1000)):
-                    lapcount += 1
-                    print('Lap {} -->'.format(lapcount), end=" ")
-                print(line.strip())
-                foundDistance = False
+#         print('Lap {} -->'.format(lapcount), end=" ")
+#         for line in _f:
 
-            if(line.find('<Track>') >= 0):
-                track = True
+#             if self._progress is None:
+#                 pass
+#             else:
+#                 linetracker += 1
+#                 percent = (linetracker / maxval) * 100
+#                 linecnt.set(linetracker)
+# #                self._progress.update_idletasks()
 
-            if(line.find('<DistanceMeters>') >= 0 and track):
-                foundDistance = True
+#             if(foundDistance):
+#                 line = line.strip()
+
+#                 if(float(line) >= float(lapcount) * (self._splitresKM * 1000)):
+#                     lapcount += 1
+#                     print('Lap {} -->'.format(lapcount), end=" ")
+#                 print(line.strip(), end=" {} {:.1f}%\n".format(float(linetracker), percent))
+#                 foundDistance = False
+
+#             if(line.find('<Track>') >= 0):
+#                 track = True
+
+#             if(line.find('<DistanceMeters>') >= 0 and track):
+#                 foundDistance = True
         _f.close()
 
     def _make_gen(self, reader):
@@ -63,6 +83,41 @@ class TcxSplitSingleLap:
             yield _b
             _b = reader(1024 * 1024)
 
+
+def ParseLineInFile(file, splitresKM, *args):
+    foundDistance = False
+    track = False
+    lapcount = 1
+    linetracker = 0.0
+
+    print('Lap {} -->'.format(lapcount), end=" ")
+    for line in file:
+        if len(args):
+            linetracker += 1
+            percent = (linetracker / args[1]) * 100
+            args[0].set(linetracker)
+            # global progressbar
+            # progressbar.update_idletasks()
+
+        if(foundDistance):
+            line = line.strip()
+
+            if(float(line) >= float(lapcount) * (splitresKM * 1000)):
+                lapcount += 1
+                print('Lap {} -->'.format(lapcount), end=" ")
+
+            if len(args):
+                print(line.strip(), end=" {} {:.1f}%\n".format(
+                    args[0].get(), percent))
+            else:
+                print(line.strip())
+            foundDistance = False
+
+        if(line.find('<Track>') >= 0):
+            track = True
+
+        if(line.find('<DistanceMeters>') >= 0 and track):
+            foundDistance = True
 
 def EntryAfterIdleCallback():
         global entry
@@ -88,9 +143,11 @@ def SelectFile():
             entry.after_idle(EntryAfterIdleCallback)
             entry.config(state='readonly')
 
+            global progressbar
             global lap_res
             mmrSplit = TcxSplitSingleLap(file=filename,
-                                         split_res_KM=lap_res.get())
+                                         split_res_KM=lap_res.get(),
+                                         progbar=progressbar)
             # linecount = mmrSplit.getlinecount()
             # print(linecount)
             mmrSplit.parseline()
@@ -111,8 +168,10 @@ def main():
     # Create frames for the filename widgets and lap resolution widgets
     frameFile = ttk.Frame(root)
     frameLapRes = ttk.Frame(root)
+    frameProgressBar = ttk.Frame(root)
     frameFile.pack()
     frameLapRes.pack()
+    frameProgressBar.pack(expand=True, fill='x')
 
     global entry
     entry = ttk.Entry(frameFile, width=30, state='readonly')
@@ -137,7 +196,9 @@ def main():
     #                      state='readonly')
     # spinbox_km.grid(row=1, column=2, pady=(5, 10), sticky='w')
 
+    ###############################################
     # Use scale widget to select lap resolution
+    ###############################################
     ttk.Label(frameLapRes, text='Split every: ', justify=LEFT).pack(
         side=LEFT, pady=(0, 5))
 
@@ -153,6 +214,12 @@ def main():
     global kmLabel
     kmLabel = ttk.Label(frameLapRes, text='{} KM'.format(lap_res.get()))
     kmLabel.pack(side=LEFT, padx=5, pady=(0, 5))
+
+    global progressbar
+    progressbar = ttk.Progressbar(frameProgressBar, orient=HORIZONTAL,
+                                  mode='determinate')
+    #progressbar = ttk.Progressbar(mode='indeterminate')
+    progressbar.pack(padx=10, pady=(0, 10), expand=True, fill='x')
 
     root.mainloop()
 
