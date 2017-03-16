@@ -38,33 +38,37 @@ class TcxSplitSingleLap:
 
     def parseline(self):
         if self._progress is None:
-            pass
+            _f = open(self._filename)
+            ParseLineInFile(_f, self._splitresKM)
+            _f.close()
         else:
             self.maxval = float(self.getlinecount())
             self.linecnt = DoubleVar()
             self.linecnt.set(0)
             self._progress.config(maximum=self.maxval, variable=self.linecnt)
 
-            self.secondary_thread = threading.Thread(target=self._callparseline)
+            self.secondary_thread = threading.Thread(
+                target=self._callparseline)
             self.secondary_thread.start()
             # check the Queue in 50ms
-            self.after(1, self._check_que)
-
+            global root
+            root.after(1, self._check_que)
 
     def _check_que(self):
-            while True:
-                global que
-                try:
-                    x = que.get_nowait()
-                except queue.Empty:
-                    self.after(1, self.check_que)
-                    break
-                else:  # continue from the try suite
+        while True:
+            global que
+            try:
+                x = que.get_nowait()
+            except queue.Empty:
+                global root
+                root.after(1, self._check_que)
+                break
+            else:  # continue from the try suite
 #                    self.label['text'] = '{}/4'.format(x)
-                    self.linecnt.set(x)
-                    # if x == 4:
-                    #     self.b_start['state'] = 'normal'
-                    #     break
+                self.linecnt.set(x)
+                # if x == 4:
+                #     self.b_start['state'] = 'normal'
+                #     break
 
     def _make_gen(self, reader):
         _b = reader(1024 * 1024)
@@ -143,9 +147,13 @@ def SelectFile():
 
             global progressbar
             global lap_res
+
+            # mmrSplit = TcxSplitSingleLap(file=filename,
+            #                              split_res_KM=lap_res.get(),
+            #                              progbar=progressbar)
             mmrSplit = TcxSplitSingleLap(file=filename,
-                                         split_res_KM=lap_res.get(),
-                                         progbar=progressbar)
+                                         split_res_KM=lap_res.get())
+
             # linecount = mmrSplit.getlinecount()
             # print(linecount)
             mmrSplit.parseline()
@@ -160,6 +168,7 @@ def UpdateLapRes(horiz_var):
 
 
 def main():
+    global root
     root = Tk()
     root.title("MapMyRun TCX file Lap Splitter")
 
