@@ -52,7 +52,7 @@ class TcxSplitSingleLap:
             self.secondary_thread.start()
             # check the Queue in 50ms
             global root
-            root.after(1, self._check_que)
+            root.after(50, self._check_que)
 
     def _check_que(self):
         while True:
@@ -60,12 +60,15 @@ class TcxSplitSingleLap:
             try:
                 x = que.get_nowait()
             except queue.Empty:
-                global root
-                root.after(1, self._check_que)
+                if self.secondary_thread.is_alive() is True:
+                    global root
+                    root.after(50, self._check_que)
+                    print("Empty queue.. waiting another 50ms")
                 break
             else:  # continue from the try suite
 #                    self.label['text'] = '{}/4'.format(x)
                 self.linecnt.set(x)
+                print("DEQUEUED! {}".format(self.linecnt.get()))
                 # if x == 4:
                 #     self.b_start['state'] = 'normal'
                 #     break
@@ -89,6 +92,8 @@ def ParseLineInFile(file, splitresKM, *args):
     lapcount = 1
     linetracker = 0.0
 
+    global que
+
     print('Lap {} -->'.format(lapcount), end=" ")
     for line in file:
         if len(args):
@@ -97,6 +102,10 @@ def ParseLineInFile(file, splitresKM, *args):
             args[0].set(linetracker)
             # global progressbar
             # progressbar.update_idletasks()
+
+            if int(linetracker) % 10000 == 0:
+                print("mod 1000 line count = {} queue={}".format(linetracker, que))
+                que.put(linetracker)
 
         if(foundDistance):
             line = line.strip()
@@ -108,9 +117,6 @@ def ParseLineInFile(file, splitresKM, *args):
             if len(args):
                 print(line.strip(), end=" {} {:.1f}%\n".format(
                     args[0].get(), percent))
-
-                global que
-                que.put(linetracker)
             else:
                 print(line.strip())
             foundDistance = False
@@ -120,6 +126,9 @@ def ParseLineInFile(file, splitresKM, *args):
 
         if(line.find('<DistanceMeters>') >= 0 and track):
             foundDistance = True
+
+    que.put(linetracker)
+    print("loop done... line count={} queue={}".format(linetracker, que))
 
 def EntryAfterIdleCallback():
         global entry
@@ -148,11 +157,11 @@ def SelectFile():
             global progressbar
             global lap_res
 
-            # mmrSplit = TcxSplitSingleLap(file=filename,
-            #                              split_res_KM=lap_res.get(),
-            #                              progbar=progressbar)
             mmrSplit = TcxSplitSingleLap(file=filename,
-                                         split_res_KM=lap_res.get())
+                                         split_res_KM=lap_res.get(),
+                                         progbar=progressbar)
+            # mmrSplit = TcxSplitSingleLap(file=filename,
+            #                              split_res_KM=lap_res.get())
 
             # linecount = mmrSplit.getlinecount()
             # print(linecount)
@@ -230,7 +239,7 @@ def main():
 
     global que
     que = queue.Queue()
-
+    print("created queue... queue={}".format(que))
     root.mainloop()
 
 #    f = open('lines.txt')
