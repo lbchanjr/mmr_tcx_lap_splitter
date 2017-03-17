@@ -101,6 +101,18 @@ def ParseLineInFile(file, splitresKM, *args):
 
     file_obj = open(file)
 
+    # Generate filename to use for the output file using the input file.
+    outf = file.split('.')
+    if len(outf) == 1:
+        outfilename = file + '-split'
+    else:
+        outf[len(outf) - 2] = outf[len(outf) - 2] + '-split'
+        outfilename = '.'.join(outf)
+
+    # open output file
+    outfile_obj = open(outfilename, mode='w')
+#    print(outfilename, outfile_obj)
+
     foundDistance = False
     track = False
     lapcount = 1
@@ -111,7 +123,8 @@ def ParseLineInFile(file, splitresKM, *args):
 
     global que
 
-    print('Lap {} -->'.format(lapcount), end=" ")
+    # **Prints to file
+    print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
     for line in file_obj:
 
         # Perform enclosed operations only if progress bar is present
@@ -129,12 +142,14 @@ def ParseLineInFile(file, splitresKM, *args):
 
             if(float(line) >= float(lapcount) * (splitresKM * 1000)):
                 lapcount += 1
-                print('Lap {} -->'.format(lapcount), end=" ")
+                # **Prints to file
+                print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
 
             if len(args):
-                print(line.strip(), end=" ")
+                # **Prints to file
+                print(line.strip(), end=" ", file=outfile_obj)
                 print("progress = {}% actual progress = {:.1f}%".format(
-                    args[0].get(), percent))
+                    args[0].get(), percent), file=outfile_obj)
             else:
                 print(line.strip())
             foundDistance = False
@@ -150,6 +165,7 @@ def ParseLineInFile(file, splitresKM, *args):
 #        linetracker, que, percent))
 
     file_obj.close()
+    outfile_obj.close()
 
 
 def EntryAfterIdleCallback():
@@ -257,17 +273,16 @@ def main():
     global progressbar
     progressbar = ttk.Progressbar(frameProgressBar, orient=HORIZONTAL,
                                   mode='determinate', maximum=100, length=320)
-    #progressbar.pack(side=LEFT, padx=10, pady=(0, 10), expand=True, fill='x')
+#    progressbar.pack(side=LEFT, padx=10, pady=(0, 10), expand=True, fill='x')
     progressbar.grid(column=0, row=0, sticky='w', padx=(10, 5), pady=(0, 10))
-    
-    global pbar_label    
+
+    global pbar_label
     pbar_label = ttk.Label(frameProgressBar, text="0%")
     pbar_label.grid(column=1, row=0, padx=(0, 5), pady=(0, 10), sticky='e')
 
-
     global que
     que = queue.Queue()
-    print("created queue... queue={}".format(que))
+#   print("created queue... queue={}".format(que))
     root.mainloop()
 
 #    f = open('lines.txt')
