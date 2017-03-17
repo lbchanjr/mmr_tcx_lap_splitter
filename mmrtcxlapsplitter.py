@@ -39,9 +39,7 @@ class TcxSplitSingleLap:
 
     def parseline(self):
         if self._progress is None:
-            _f = open(self._filename)
-            ParseLineInFile(_f, self._splitresKM)
-            _f.close()
+            ParseLineInFile(self._filename, self._splitresKM)
         else:
             self.maxval = float(self.getlinecount())
             self.progbarpercent = IntVar()
@@ -53,7 +51,7 @@ class TcxSplitSingleLap:
             else:
                 global label_percent
                 label_percent = StringVar()
-                label_percent.set("0.0%")
+                label_percent.set("0%")
                 self._pbarlabel.config(textvariable=label_percent)
 
             self.secondary_thread = threading.Thread(
@@ -78,7 +76,7 @@ class TcxSplitSingleLap:
             else:  # continue from the try suite
 
                 self.progbarpercent.set(progbar_per)
-                label_percent.set('{:.1f}%'.format(actual_per))
+                label_percent.set('{}%'.format(progbar_per))
 #                print(actual_per)
 
 #                print("DEQUEUED! {}".format(self.progbarpercent.get()))
@@ -93,14 +91,16 @@ class TcxSplitSingleLap:
             _b = reader(1024 * 1024)
 
     def _callparseline(self):
-        _f = open(self._filename)
-        ParseLineInFile(_f, self._splitresKM, self.progbarpercent, self.maxval)
+        ParseLineInFile(self._filename, self._splitresKM,
+                        self.progbarpercent, self.maxval)
         # ParseLineInFile(_f, self._splitresKM)
-        _f.close()
 
 
 # arg[0] = line count, arg[1] = max lines in file
 def ParseLineInFile(file, splitresKM, *args):
+
+    file_obj = open(file)
+
     foundDistance = False
     track = False
     lapcount = 1
@@ -112,7 +112,7 @@ def ParseLineInFile(file, splitresKM, *args):
     global que
 
     print('Lap {} -->'.format(lapcount), end=" ")
-    for line in file:
+    for line in file_obj:
 
         # Perform enclosed operations only if progress bar is present
         if len(args):
@@ -148,6 +148,8 @@ def ParseLineInFile(file, splitresKM, *args):
     que.put((int(percent), percent))
 #    print("loop done... line count={} queue={} percent ={}%".format(
 #        linetracker, que, percent))
+
+    file_obj.close()
 
 
 def EntryAfterIdleCallback():
@@ -254,12 +256,12 @@ def main():
 
     global progressbar
     progressbar = ttk.Progressbar(frameProgressBar, orient=HORIZONTAL,
-                                  mode='determinate', maximum=100, length=305)
+                                  mode='determinate', maximum=100, length=320)
     #progressbar.pack(side=LEFT, padx=10, pady=(0, 10), expand=True, fill='x')
     progressbar.grid(column=0, row=0, sticky='w', padx=(10, 5), pady=(0, 10))
     
     global pbar_label    
-    pbar_label = ttk.Label(frameProgressBar, text="{:.1f}%".format(0.0))
+    pbar_label = ttk.Label(frameProgressBar, text="0%")
     pbar_label.grid(column=1, row=0, padx=(0, 5), pady=(0, 10), sticky='e')
 
 
