@@ -121,7 +121,6 @@ def ParseLineInFile(file, splitresKM, *args):
     LapString = ''
     LapHRList = []
 
-
     # PARSE FLAGS
     found_lap = False
     found_track = False
@@ -136,9 +135,9 @@ def ParseLineInFile(file, splitresKM, *args):
     # Distance variables
     last_distance = 0.0
     excess_distance = 0.0
-#    excess_time = 0.0
+    excess_time = 0.0
     splitres_meters = splitresKM * 1000
-#    dtobj_list = []
+    dtobj_list = []
 
     # # TEST WRITE FLAGS
     # foundDistance = False
@@ -237,39 +236,36 @@ def ParseLineInFile(file, splitresKM, *args):
                     elif found_distance:
                         if search_dist_endtrackpt is False:
                             current_distance = float(line.strip())
-                            # if current_distance == 0:
-                            #     lasttime_dtobj = currenttime_dtobj
 
-                            #distance_offset = current_distance
-                            #- last_distance
-                            #LapDistanceMeters += distance_offset
-                            LapDistanceMeters += (
+                            distance_offset = (
                                 current_distance - last_distance)
+                            LapDistanceMeters += distance_offset
+                            # LapDistanceMeters += (
+                            #     current_distance - last_distance)
                             last_distance = current_distance
 
-                            # TODO
-                            # if current_distance == 0.0:
-                            #     dtobj_list = [currenttime_dtobj]
-                            # else:
-                            #     dtobj_list.append(currenttime_dtobj)
+                            if current_distance == 0.0:
+                                dtobj_list = [currenttime_dtobj]
+                            else:
+                                dtobj_list.append(currenttime_dtobj)
 
                             if LapDistanceMeters >= splitres_meters:
                                 search_dist_endtrackpt = True
 
-                                # delta_distance = LapDistanceMeters
-                                # - splitres_meters
-                                # excess_distance += delta_distance
-                                excess_distance += (
+                                delta_distance = (
                                     LapDistanceMeters - splitres_meters)
+                                excess_distance += delta_distance
+                                # excess_distance += (
+                                #     LapDistanceMeters - splitres_meters)
                                 LapDistanceMeters = splitres_meters
 
-                                # tdelta = currenttime_dtobj - dtobj_list[len(
-                                #     dtobj_list) - 2]
-                                # tdelta_secs = tdelta.total_seconds()
-                                # delta_pace = tdelta_secs / distance_offset
+                                tdelta = currenttime_dtobj - dtobj_list[len(
+                                    dtobj_list) - 2]
+                                tdelta_secs = tdelta.total_seconds()
+                                delta_pace = tdelta_secs / distance_offset
 
-                                # delta_time = delta_pace * delta_distance
-                                # excess_time += delta_time
+                                delta_time = delta_pace * delta_distance
+                                excess_time += delta_time
 
                             else:
                                 found_distance = False
@@ -279,8 +275,14 @@ def ParseLineInFile(file, splitresKM, *args):
                                 # Calculate Lap start time and current time
                                 # delta and convert to seconds
                                 timedelta = currenttime_dtobj - starttime_dtobj
-                                LapTotalTimeSeconds = timedelta.total_seconds()  #- delta_time
-                                # print('Lap Total time = {} Last time diff = {} Delta Time = {} Delta distance = {}'.format(LapTotalTimeSeconds, tdelta_secs, delta_time, delta_distance))
+                                if line.find('</Track>') >= 0:
+                                    LapTotalTimeSeconds = (
+                                        timedelta.total_seconds() + (
+                                            excess_time))
+                                else:
+                                    LapTotalTimeSeconds = (
+                                        timedelta.total_seconds() - (
+                                            delta_time))
                                 # Get max HR for the lap
                                 LapMaximumHR = float(max(LapHRList))
                                 # Compute average HR for the lap
@@ -301,7 +303,6 @@ def ParseLineInFile(file, splitresKM, *args):
                                 # to the final lap.
                                 if line.find('</Track>') >= 0:
                                     LapDistanceMeters += excess_distance
-#                                    print('LapDistance = {}   ExcessDistance = {}'.format(LapDistanceMeters, excess_distance))
 
                                 # Append lap distance
                                 print('\t\t\t\t\t<DistanceMeters>',
@@ -345,7 +346,7 @@ def ParseLineInFile(file, splitresKM, *args):
 
                                 # Add lap end tags and write buffer to file
                                 LapString += line
-                                # No need to append lap and track end tags 
+                                # No need to append lap and track end tags
                                 # if we have reached the end of the lap info
                                 if line.find('</Track>') < 0:
                                     LapString += '\t\t\t\t</Track>\n'
@@ -358,6 +359,7 @@ def ParseLineInFile(file, splitresKM, *args):
                                 LapString = ""
                                 LapDistanceMeters = 0.0
                                 LapHRList = []
+                                dtobj_list = []
 
                                 found_lap_time = False
                                 found_something = False
@@ -385,7 +387,8 @@ def ParseLineInFile(file, splitresKM, *args):
 #             if(float(line) >= float(lapcount) * (splitresKM * 1000)):
 #                 lapcount += 1
 #                 # **Prints to file
-# #                print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
+# #                print('Lap {} -->'.format(
+# 						lapcount), end=" ", file=outfile_obj)
 #
 #             if len(args):
 #                 # **Prints to file
