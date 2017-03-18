@@ -4,9 +4,14 @@
 # rebuilds the file to contain more than 1 lap.
 # Copyright 2017 ChanSoft, LLC
 
+import threading
+import queue
+
 from tkinter import *
 from tkinter import ttk
 from tkinter import filedialog
+
+from datetime import datetime
 
 entry = ''
 lap_header = []
@@ -24,6 +29,8 @@ class TcxSplitSingleLap:
                             "the 'file=<filename>' option.")
 
         self._splitresKM = kwargs.get('split_res_KM', 1.0)
+        self._progress = kwargs.get('progbar')
+        self._pbarlabel = kwargs.get('pbarlabel')
 
     def getlinecount(self):
         _f = open(self._filename, 'rb')
@@ -33,35 +40,375 @@ class TcxSplitSingleLap:
         return count
 
     def parseline(self):
-        _f = open(self._filename)
+        if self._progress is None:
+            ParseLineInFile(self._filename, self._splitresKM)
+        else:
+            self.maxval = float(self.getlinecount())
+            self.progbarpercent = IntVar()
+            self.progbarpercent.set(0)
+            self._progress.config(variable=self.progbarpercent)
 
-        foundDistance = False
-        track = False
-        lapcount = 1
-        print('Lap {} -->'.format(lapcount), end=" ")
-        for line in _f:
+            if self._pbarlabel is None:
+                pass
+            else:
+                global label_percent
+                label_percent = StringVar()
+                label_percent.set("0%")
+                self._pbarlabel.config(textvariable=label_percent)
 
-            if(foundDistance):
-                line = line.strip()
+            self.secondary_thread = threading.Thread(
+                target=self._callparseline)
+            self.secondary_thread.start()
+            # check the Queue in 1ms
+            global root
+            root.after(1, self._check_que)
 
-                if(float(line) >= float(lapcount) * (self._splitresKM * 1000)):
-                    lapcount += 1
-                    print('Lap {} -->'.format(lapcount), end=" ")
-                print(line.strip())
-                foundDistance = False
+    def _check_que(self):
+        while True:
+            global que
+            try:
+                progbar_per, actual_per = que.get_nowait()
+            except queue.Empty:
+                if self.secondary_thread.is_alive() is True:
+                    # if queue is empty, wait for another 1ms.
+                    global root
+                    root.after(1, self._check_que)
+#                   print("Empty queue.. waiting another 50ms")
+                break
+            else:  # continue from the try suite
 
-            if(line.find('<Track>') >= 0):
-                track = True
+                self.progbarpercent.set(progbar_per)
+                label_percent.set('{}%'.format(progbar_per))
+#                print(actual_per)
 
-            if(line.find('<DistanceMeters>') >= 0 and track):
-                foundDistance = True
-        _f.close()
+#                print("DEQUEUED! {}".format(self.progbarpercent.get()))
+                # if x == 4:
+                #     self.b_start['state'] = 'normal'
+                #     break
 
     def _make_gen(self, reader):
         _b = reader(1024 * 1024)
         while _b:
             yield _b
             _b = reader(1024 * 1024)
+
+    def _callparseline(self):
+        ParseLineInFile(self._filename, self._splitresKM,
+                        self.progbarpercent, self.maxval)
+        # ParseLineInFile(_f, self._splitresKM)
+
+
+# arg[0] = line count, arg[1] = max lines in file
+def ParseLineInFile(file, splitresKM, *args):
+
+    file_obj = open(file)
+
+    # Generate filename to use for the output file using the input file.
+    outf = file.split('.')
+    if len(outf) == 1:
+        outfilename = file + '-split'
+    else:
+        outf[len(outf) - 2] = outf[len(outf) - 2] + '-split'
+        outfilename = '.'.join(outf)
+
+    # open output file
+    outfile_obj = open(outfilename, mode='w', newline='\n')
+#    print(outfilename, outfile_obj)
+
+    # LAP VARIABLES
+#    LapTotalTimeSeconds = 0.0
+    LapDistanceMeters = 0.0
+    LapString = ''
+    LapHRList = []
+
+
+    # PARSE FLAGS
+    found_lap = False
+    found_track = False
+    found_lap_time = False
+
+    found_something = False
+    found_time = False
+    found_heartrate = False
+    found_distance = False
+    search_dist_endtrackpt = False
+
+    # Distance variables
+    last_distance = 0.0
+    excess_distance = 0.0
+#    excess_time = 0.0
+    splitres_meters = splitresKM * 1000
+#    dtobj_list = []
+
+    # # TEST WRITE FLAGS
+    # foundDistance = False
+    # track = False
+    # lapcount = 1
+
+    # PROGRESS BAR VARIABLES
+    # tracks if the same percent integer value has been calculated
+    lastpercent = 0
+    linetracker = 0   # tracks the number of lines within the file
+
+    global que
+
+    # **Prints to file
+#    print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
+    for line in file_obj:
+
+        # Perform enclosed operations only if progress bar is present
+        if len(args):
+            linetracker += 1
+            percent = (linetracker / args[1]) * 100
+
+            # Update queue only if the integer percent value has changed
+            if lastpercent != int(percent):
+                lastpercent = int(percent)
+                que.put((lastpercent, percent))
+
+        # Check if a Lap tag has been found.
+        if found_lap is False:
+            if line.find('<Lap StartTime') >= 0:
+                found_lap = True
+            else:
+                print(line, end="", file=outfile_obj)
+        else:
+            if found_track is False:
+                if line.find('<Track>') >= 0:
+                    found_track = True
+                else:
+                    continue
+            else:
+                # check if track end tag has been found
+                if line.find('</Track>') >= 0:
+                    if found_lap_time is True:
+                        # Simulate a lap so that lap header will be written
+                        # to the output file
+                        found_distance = True
+                        found_something = True
+                        search_dist_endtrackpt = True
+                    else:
+                        LapString += '\t\t</Activity>\n'
+                        LapString += '\t</Activities>\n'
+                        LapString += '</TrainingCenterDatabase>'
+                        break
+
+                if found_something is False:
+                    if line.find('<Time>') >= 0:
+                        found_time = True
+                        found_something = True
+                    elif line.find('<Value>') >= 0:
+                        found_heartrate = True
+                        found_something = True
+                    elif line.find('<DistanceMeters>') >= 0:
+                        found_distance = True
+                        found_something = True
+                    else:
+                        pass
+                else:
+                    if found_time:
+                        found_time = False
+                        if found_lap_time is False:
+                            laptimelist = line.strip().split('.')
+                            # Print Lap tag to file
+                            print('\t\t\t<Lap StartTime="{}+00:00">\n'.format(
+                                laptimelist[0]), end="", file=outfile_obj)
+
+                            # Get lap start time and save as a datetime obj
+                            dt_obj = line.strip().split('+')
+                            if dt_obj[0].find('.') < 0:
+                                dt_obj[0] += '.000000'
+                            starttime_dtobj = datetime.strptime(
+                                dt_obj[0], '%Y-%m-%dT%H:%M:%S.%f')
+
+                            found_lap_time = True
+                        else:
+                            # For any other occurences of the Time tag, just
+                            # save its datetime obj equivalent
+                            dt_obj = line.strip().split('+')
+                            if dt_obj[0].find('.') < 0:
+                                dt_obj[0] += '.000000'
+                            currenttime_dtobj = datetime.strptime(
+                                dt_obj[0], '%Y-%m-%dT%H:%M:%S.%f')
+                    elif found_heartrate:
+                        found_heartrate = False
+                        LapHRList.append(int(line.strip()))
+
+                    elif found_distance:
+                        if search_dist_endtrackpt is False:
+                            current_distance = float(line.strip())
+                            # if current_distance == 0:
+                            #     lasttime_dtobj = currenttime_dtobj
+
+                            #distance_offset = current_distance
+                            #- last_distance
+                            #LapDistanceMeters += distance_offset
+                            LapDistanceMeters += (
+                                current_distance - last_distance)
+                            last_distance = current_distance
+
+                            # TODO
+                            # if current_distance == 0.0:
+                            #     dtobj_list = [currenttime_dtobj]
+                            # else:
+                            #     dtobj_list.append(currenttime_dtobj)
+
+                            if LapDistanceMeters >= splitres_meters:
+                                search_dist_endtrackpt = True
+
+                                # delta_distance = LapDistanceMeters
+                                # - splitres_meters
+                                # excess_distance += delta_distance
+                                excess_distance += (
+                                    LapDistanceMeters - splitres_meters)
+                                LapDistanceMeters = splitres_meters
+
+                                # tdelta = currenttime_dtobj - dtobj_list[len(
+                                #     dtobj_list) - 2]
+                                # tdelta_secs = tdelta.total_seconds()
+                                # delta_pace = tdelta_secs / distance_offset
+
+                                # delta_time = delta_pace * delta_distance
+                                # excess_time += delta_time
+
+                            else:
+                                found_distance = False
+                        else:
+                            if (line.find('</Trackpoint>') >= 0) or (
+                               line.find('</Track>') >= 0):
+                                # Calculate Lap start time and current time
+                                # delta and convert to seconds
+                                timedelta = currenttime_dtobj - starttime_dtobj
+                                LapTotalTimeSeconds = timedelta.total_seconds()  #- delta_time
+                                # print('Lap Total time = {} Last time diff = {} Delta Time = {} Delta distance = {}'.format(LapTotalTimeSeconds, tdelta_secs, delta_time, delta_distance))
+                                # Get max HR for the lap
+                                LapMaximumHR = float(max(LapHRList))
+                                # Compute average HR for the lap
+                                LapAverageHR = float(sum(LapHRList)) / max(
+                                    len(LapHRList), 1)
+
+                                # APPEND LAP SUMMARY DATA TO FILE
+
+                                # Append lap total time
+                                print('\t\t\t\t\t<TotalTimeSeconds>',
+                                      file=outfile_obj)
+                                print('\t\t\t\t\t\t{:.1f}'.format(
+                                    LapTotalTimeSeconds), file=outfile_obj)
+                                print('\t\t\t\t\t</TotalTimeSeconds>',
+                                      file=outfile_obj)
+
+                                # Compensate for excess distance by adding it
+                                # to the final lap.
+                                if line.find('</Track>') >= 0:
+                                    LapDistanceMeters += excess_distance
+#                                    print('LapDistance = {}   ExcessDistance = {}'.format(LapDistanceMeters, excess_distance))
+
+                                # Append lap distance
+                                print('\t\t\t\t\t<DistanceMeters>',
+                                      file=outfile_obj)
+                                print('\t\t\t\t\t\t{:.1f}'.format(
+                                    LapDistanceMeters), file=outfile_obj)
+                                print('\t\t\t\t\t</DistanceMeters>',
+                                      file=outfile_obj)
+
+                                # Append dummy calorie data (value = 0)
+                                print('\t\t\t\t\t<Calories>',
+                                      file=outfile_obj)
+                                print('\t\t\t\t\t\t0', file=outfile_obj)
+                                print('\t\t\t\t\t</Calories>',
+                                      file=outfile_obj)
+
+                                # Append lap average HR tag
+                                print('\t\t\t\t\t<AverageHeartRateBpm xsi'
+                                      ':type="HeartRateInBeatsPerMinute_t">',
+                                      file=outfile_obj)
+                                print('\t\t\t\t\t\t<Value>', file=outfile_obj)
+                                print('\t\t\t\t\t\t\t{}.0'.format(
+                                    int(LapAverageHR)), file=outfile_obj)
+                                print('\t\t\t\t\t\t</Value>', file=outfile_obj)
+                                print('\t\t\t\t\t</AverageHeartRateBpm>',
+                                      file=outfile_obj)
+
+                                # Append lap maximum HR tag
+                                print('\t\t\t\t\t<MaximumHeartRateBpm xsi'
+                                      ':type="HeartRateInBeatsPerMinute_t">',
+                                      file=outfile_obj)
+                                print('\t\t\t\t\t\t<Value>', file=outfile_obj)
+                                print('\t\t\t\t\t\t\t{:.1f}'.format(
+                                    LapMaximumHR), file=outfile_obj)
+                                print('\t\t\t\t\t\t</Value>', file=outfile_obj)
+                                print('\t\t\t\t\t</MaximumHeartRateBpm>',
+                                      file=outfile_obj)
+
+                                # Write track tag to file
+                                print('\t\t\t\t<Track>', file=outfile_obj)
+
+                                # Add lap end tags and write buffer to file
+                                LapString += line
+                                # No need to append lap and track end tags 
+                                # if we have reached the end of the lap info
+                                if line.find('</Track>') < 0:
+                                    LapString += '\t\t\t\t</Track>\n'
+                                    LapString += '\t\t\t</Lap>\n'
+                                print(LapString, end="", file=outfile_obj)
+                                # print('Inside Loop Lap String: \n\t', end='')
+                                # print(LapString)
+
+                                # Reset lap flags and variables
+                                LapString = ""
+                                LapDistanceMeters = 0.0
+                                LapHRList = []
+
+                                found_lap_time = False
+                                found_something = False
+                                found_time = False
+                                found_heartrate = False
+                                found_distance = False
+                                search_dist_endtrackpt = False
+                                continue
+                    else:
+                        pass
+
+                    if search_dist_endtrackpt is False:
+                        found_something = False
+
+                LapString += line
+    if len(LapString) > 0:
+        print(LapString, end="", file=outfile_obj)
+        # print('Exit Loop Lap String: \n\t', end='')
+        # print(LapString)
+
+#         # TEST FILE WRITE CODE
+#         if(foundDistance):
+#             line = line.strip()
+#
+#             if(float(line) >= float(lapcount) * (splitresKM * 1000)):
+#                 lapcount += 1
+#                 # **Prints to file
+# #                print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
+#
+#             if len(args):
+#                 # **Prints to file
+# #               print(line.strip(), end=" ", file=outfile_obj)
+# #               print("progress = {}% actual progress = {:.1f}%".format(
+# #                   args[0].get(), percent), file=outfile_obj)
+#                 pass
+#             else:
+#                 print(line.strip())
+#             foundDistance = False
+#
+#         if(line.find('<Track>') >= 0):
+#             track = True
+#
+#         if(line.find('<DistanceMeters>') >= 0 and track):
+#             foundDistance = True
+
+    que.put((int(percent), percent))
+#    print("loop done... line count={} queue={} percent ={}%".format(
+#        linetracker, que, percent))
+
+    file_obj.close()
+    outfile_obj.close()
 
 
 def EntryAfterIdleCallback():
@@ -88,9 +435,16 @@ def SelectFile():
             entry.after_idle(EntryAfterIdleCallback)
             entry.config(state='readonly')
 
+            global progressbar
             global lap_res
+            global pbar_label
             mmrSplit = TcxSplitSingleLap(file=filename,
-                                         split_res_KM=lap_res.get())
+                                         split_res_KM=lap_res.get(),
+                                         progbar=progressbar,
+                                         pbarlabel=pbar_label)
+            # mmrSplit = TcxSplitSingleLap(file=filename,
+            #                              split_res_KM=lap_res.get())
+
             # linecount = mmrSplit.getlinecount()
             # print(linecount)
             mmrSplit.parseline()
@@ -105,14 +459,17 @@ def UpdateLapRes(horiz_var):
 
 
 def main():
+    global root
     root = Tk()
     root.title("MapMyRun TCX file Lap Splitter")
 
     # Create frames for the filename widgets and lap resolution widgets
     frameFile = ttk.Frame(root)
     frameLapRes = ttk.Frame(root)
+    frameProgressBar = ttk.Frame(root)
     frameFile.pack()
     frameLapRes.pack()
+    frameProgressBar.pack(expand=True, fill='x')
 
     global entry
     entry = ttk.Entry(frameFile, width=30, state='readonly')
@@ -137,7 +494,9 @@ def main():
     #                      state='readonly')
     # spinbox_km.grid(row=1, column=2, pady=(5, 10), sticky='w')
 
+    ###############################################
     # Use scale widget to select lap resolution
+    ###############################################
     ttk.Label(frameLapRes, text='Split every: ', justify=LEFT).pack(
         side=LEFT, pady=(0, 5))
 
@@ -154,6 +513,19 @@ def main():
     kmLabel = ttk.Label(frameLapRes, text='{} KM'.format(lap_res.get()))
     kmLabel.pack(side=LEFT, padx=5, pady=(0, 5))
 
+    global progressbar
+    progressbar = ttk.Progressbar(frameProgressBar, orient=HORIZONTAL,
+                                  mode='determinate', maximum=100, length=320)
+#    progressbar.pack(side=LEFT, padx=10, pady=(0, 10), expand=True, fill='x')
+    progressbar.grid(column=0, row=0, sticky='w', padx=(10, 5), pady=(0, 10))
+
+    global pbar_label
+    pbar_label = ttk.Label(frameProgressBar, text="0%")
+    pbar_label.grid(column=1, row=0, padx=(0, 5), pady=(0, 10), sticky='e')
+
+    global que
+    que = queue.Queue()
+#   print("created queue... queue={}".format(que))
     root.mainloop()
 
 #    f = open('lines.txt')
