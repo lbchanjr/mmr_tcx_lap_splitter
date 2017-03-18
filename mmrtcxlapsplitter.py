@@ -34,7 +34,7 @@ class TcxSplitSingleLap:
 
     def getlinecount(self):
         _f = open(self._filename, 'rb')
-        _fgen = self._make_gen(_f.raw.read)
+        _fgen = make_gen(_f.raw.read)
         count = sum(_buf.count(b'\n') for _buf in _fgen)
         _f.close()
         return count
@@ -86,31 +86,73 @@ class TcxSplitSingleLap:
                 #     self.b_start['state'] = 'normal'
                 #     break
 
-    def _make_gen(self, reader):
-        _b = reader(1024 * 1024)
-        while _b:
-            yield _b
-            _b = reader(1024 * 1024)
-
     def _callparseline(self):
         ParseLineInFile(self._filename, self._splitresKM,
                         self.progbarpercent, self.maxval)
         # ParseLineInFile(_f, self._splitresKM)
 
+def make_gen(reader):
+    b = reader(1024 * 1024)
+    while b:
+        yield b
+        b = reader(1024 * 1024)
 
 # arg[0] = line count, arg[1] = max lines in file
 def ParseLineInFile(file, splitresKM, *args):
 
     file_obj = open(file)
 
+    # make a copy of the line count for the file
+    max_lines = args[1]
+
     # Generate filename to use for the output file using the input file.
     outf = file.split('.')
     if len(outf) == 1:
-        outfilename = file + '-split'
+        raise Exception("Not a .tcx file.")
     else:
         outf[len(outf) - 2] = outf[len(outf) - 2] + '-split'
         outfilename = '.'.join(outf)
 
+    # Test if TCX file has newlines or is one big chunk
+    # of test.
+    bufstr = file_obj.read(50)
+    file_obj.seek(0)        # reset file pointer to the beginning of file
+    if bufstr.find('\x0a') < 0:
+        # file has no newline character, convert it to a
+        # file that is delimited by newline for each tag and value
+        bufstr = file_obj.read()
+        bufstr = bufstr.replace('>', '>\x0a')
+        cur_index = 0
+        while cur_index >= 0:
+            cur_index = bufstr.find('</', cur_index)
+            if cur_index >= 0:
+                if bufstr[cur_index - 1].isdigit() is True:
+                    bufstr = bufstr[:cur_index] + '\x0a' + bufstr[cur_index:]
+                    cur_index += 2
+                else:
+                    cur_index += 1
+
+        file_obj.close()
+
+        # Write buffer to temp file that will be worked on
+        outf = outfilename.split('-split')
+        outf[len(outf) - 2] = outf[len(outf) - 2] + '-linesep'
+        newfilename = outf[len(outf) - 2] + '.tcx'
+        outfile_obj = open(newfilename, mode='w', newline='\n')
+        outfile_obj.write(bufstr)
+        outfile_obj.close()
+
+        outfile_obj = open(newfilename, 'rb')
+        fgen = make_gen(outfile_obj.raw.read)
+        max_lines = sum(buf.count(b'\n') for buf in fgen)
+        outfile_obj.close()
+
+        #print(max_lines)
+
+        # setup file object to read based on the newly created file
+        file_obj = open(newfilename)
+
+#        print(file_obj)
     # open output file
     outfile_obj = open(outfilename, mode='w', newline='\n')
 #    print(outfilename, outfile_obj)
@@ -154,11 +196,11 @@ def ParseLineInFile(file, splitresKM, *args):
     # **Prints to file
 #    print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
     for line in file_obj:
-
         # Perform enclosed operations only if progress bar is present
         if len(args):
             linetracker += 1
-            percent = (linetracker / args[1]) * 100
+     #       print('{}: {}'.format(linetracker, line), end='')
+            percent = (linetracker / max_lines) * 100
 
             # Update queue only if the integer percent value has changed
             if lastpercent != int(percent):
@@ -227,8 +269,8 @@ def ParseLineInFile(file, splitresKM, *args):
                             dt_obj = line.strip().split('+')
                             if dt_obj[0].find('.') < 0:
                                 dt_obj[0] += '.000000'
-                            currenttime_dtobj = datetime.strptime(
-                                dt_obj[0], '%Y-%m-%dT%H:%M:%S.%f')
+                        currenttime_dtobj = datetime.strptime(
+                            dt_obj[0], '%Y-%m-%dT%H:%M:%S.%f')
                     elif found_heartrate:
                         found_heartrate = False
                         LapHRList.append(int(line.strip()))
@@ -245,6 +287,17 @@ def ParseLineInFile(file, splitresKM, *args):
                             last_distance = current_distance
 
                             if current_distance == 0.0:
+                                # try:
+                                #     dtobj_list = [currenttime_dtobj]
+                                # except Exception as e:
+                                #     print(e)
+                                #     #print('line = {}'.format(linetracker))
+
+                                #     #print(currenttime_dtobj)
+                                #     print('foundlap = {}  foundtrack = {} foundtime = {} foundlaptime = {}'.format(
+                                #         found_lap, found_track, found_time, found_lap_time))
+                                # else:
+                                #     pass
                                 dtobj_list = [currenttime_dtobj]
                             else:
                                 dtobj_list.append(currenttime_dtobj)
@@ -388,7 +441,7 @@ def ParseLineInFile(file, splitresKM, *args):
 #                 lapcount += 1
 #                 # **Prints to file
 # #                print('Lap {} -->'.format(
-# 						lapcount), end=" ", file=outfile_obj)
+#                       lapcount), end=" ", file=outfile_obj)
 #
 #             if len(args):
 #                 # **Prints to file
