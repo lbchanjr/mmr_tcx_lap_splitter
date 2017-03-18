@@ -11,6 +11,8 @@ from tkinter import *
 from tkinter import ttk
 from tkinter import filedialog
 
+from datetime import datetime
+
 entry = ''
 lap_header = []
 
@@ -110,21 +112,48 @@ def ParseLineInFile(file, splitresKM, *args):
         outfilename = '.'.join(outf)
 
     # open output file
-    outfile_obj = open(outfilename, mode='w')
+    outfile_obj = open(outfilename, mode='w', newline='\n')
 #    print(outfilename, outfile_obj)
 
-    foundDistance = False
-    track = False
-    lapcount = 1
-    linetracker = 0   # tracks the number of lines within the file
+    # LAP VARIABLES
+#    LapTotalTimeSeconds = 0.0
+    LapDistanceMeters = 0.0
+    LapString = ''
+    LapHRList = []
 
+
+    # PARSE FLAGS
+    found_lap = False
+    found_track = False
+    found_lap_time = False
+
+    found_something = False
+    found_time = False
+    found_heartrate = False
+    found_distance = False
+    search_dist_endtrackpt = False
+
+    # Distance variables
+    last_distance = 0.0
+    excess_distance = 0.0
+#    excess_time = 0.0
+    splitres_meters = splitresKM * 1000
+#    dtobj_list = []
+
+    # # TEST WRITE FLAGS
+    # foundDistance = False
+    # track = False
+    # lapcount = 1
+
+    # PROGRESS BAR VARIABLES
     # tracks if the same percent integer value has been calculated
     lastpercent = 0
+    linetracker = 0   # tracks the number of lines within the file
 
     global que
 
     # **Prints to file
-    print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
+#    print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
     for line in file_obj:
 
         # Perform enclosed operations only if progress bar is present
@@ -137,28 +166,242 @@ def ParseLineInFile(file, splitresKM, *args):
                 lastpercent = int(percent)
                 que.put((lastpercent, percent))
 
-        if(foundDistance):
-            line = line.strip()
-
-            if(float(line) >= float(lapcount) * (splitresKM * 1000)):
-                lapcount += 1
-                # **Prints to file
-                print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
-
-            if len(args):
-                # **Prints to file
-                print(line.strip(), end=" ", file=outfile_obj)
-                print("progress = {}% actual progress = {:.1f}%".format(
-                    args[0].get(), percent), file=outfile_obj)
+        # Check if a Lap tag has been found.
+        if found_lap is False:
+            if line.find('<Lap StartTime') >= 0:
+                found_lap = True
             else:
-                print(line.strip())
-            foundDistance = False
+                print(line, end="", file=outfile_obj)
+        else:
+            if found_track is False:
+                if line.find('<Track>') >= 0:
+                    found_track = True
+                else:
+                    continue
+            else:
+                # check if track end tag has been found
+                if line.find('</Track>') >= 0:
+                    if found_lap_time is True:
+                        # Simulate a lap so that lap header will be written
+                        # to the output file
+                        found_distance = True
+                        found_something = True
+                        search_dist_endtrackpt = True
+                    else:
+                        LapString += '\t\t</Activity>\n'
+                        LapString += '\t</Activities>\n'
+                        LapString += '</TrainingCenterDatabase>'
+                        break
 
-        if(line.find('<Track>') >= 0):
-            track = True
+                if found_something is False:
+                    if line.find('<Time>') >= 0:
+                        found_time = True
+                        found_something = True
+                    elif line.find('<Value>') >= 0:
+                        found_heartrate = True
+                        found_something = True
+                    elif line.find('<DistanceMeters>') >= 0:
+                        found_distance = True
+                        found_something = True
+                    else:
+                        pass
+                else:
+                    if found_time:
+                        found_time = False
+                        if found_lap_time is False:
+                            laptimelist = line.strip().split('.')
+                            # Print Lap tag to file
+                            print('\t\t\t<Lap StartTime="{}+00:00">\n'.format(
+                                laptimelist[0]), end="", file=outfile_obj)
 
-        if(line.find('<DistanceMeters>') >= 0 and track):
-            foundDistance = True
+                            # Get lap start time and save as a datetime obj
+                            dt_obj = line.strip().split('+')
+                            if dt_obj[0].find('.') < 0:
+                                dt_obj[0] += '.000000'
+                            starttime_dtobj = datetime.strptime(
+                                dt_obj[0], '%Y-%m-%dT%H:%M:%S.%f')
+
+                            found_lap_time = True
+                        else:
+                            # For any other occurences of the Time tag, just
+                            # save its datetime obj equivalent
+                            dt_obj = line.strip().split('+')
+                            if dt_obj[0].find('.') < 0:
+                                dt_obj[0] += '.000000'
+                            currenttime_dtobj = datetime.strptime(
+                                dt_obj[0], '%Y-%m-%dT%H:%M:%S.%f')
+                    elif found_heartrate:
+                        found_heartrate = False
+                        LapHRList.append(int(line.strip()))
+
+                    elif found_distance:
+                        if search_dist_endtrackpt is False:
+                            current_distance = float(line.strip())
+                            # if current_distance == 0:
+                            #     lasttime_dtobj = currenttime_dtobj
+
+                            #distance_offset = current_distance
+                            #- last_distance
+                            #LapDistanceMeters += distance_offset
+                            LapDistanceMeters += (
+                                current_distance - last_distance)
+                            last_distance = current_distance
+
+                            # TODO
+                            # if current_distance == 0.0:
+                            #     dtobj_list = [currenttime_dtobj]
+                            # else:
+                            #     dtobj_list.append(currenttime_dtobj)
+
+                            if LapDistanceMeters >= splitres_meters:
+                                search_dist_endtrackpt = True
+
+                                # delta_distance = LapDistanceMeters
+                                # - splitres_meters
+                                # excess_distance += delta_distance
+                                excess_distance += (
+                                    LapDistanceMeters - splitres_meters)
+                                LapDistanceMeters = splitres_meters
+
+                                # tdelta = currenttime_dtobj - dtobj_list[len(
+                                #     dtobj_list) - 2]
+                                # tdelta_secs = tdelta.total_seconds()
+                                # delta_pace = tdelta_secs / distance_offset
+
+                                # delta_time = delta_pace * delta_distance
+                                # excess_time += delta_time
+
+                            else:
+                                found_distance = False
+                        else:
+                            if (line.find('</Trackpoint>') >= 0) or (
+                               line.find('</Track>') >= 0):
+                                # Calculate Lap start time and current time
+                                # delta and convert to seconds
+                                timedelta = currenttime_dtobj - starttime_dtobj
+                                LapTotalTimeSeconds = timedelta.total_seconds()  #- delta_time
+                                # print('Lap Total time = {} Last time diff = {} Delta Time = {} Delta distance = {}'.format(LapTotalTimeSeconds, tdelta_secs, delta_time, delta_distance))
+                                # Get max HR for the lap
+                                LapMaximumHR = float(max(LapHRList))
+                                # Compute average HR for the lap
+                                LapAverageHR = float(sum(LapHRList)) / max(
+                                    len(LapHRList), 1)
+
+                                # APPEND LAP SUMMARY DATA TO FILE
+
+                                # Append lap total time
+                                print('\t\t\t\t\t<TotalTimeSeconds>',
+                                      file=outfile_obj)
+                                print('\t\t\t\t\t\t{:.1f}'.format(
+                                    LapTotalTimeSeconds), file=outfile_obj)
+                                print('\t\t\t\t\t</TotalTimeSeconds>',
+                                      file=outfile_obj)
+
+                                # Compensate for excess distance by adding it
+                                # to the final lap.
+                                if line.find('</Track>') >= 0:
+                                    LapDistanceMeters += excess_distance
+#                                    print('LapDistance = {}   ExcessDistance = {}'.format(LapDistanceMeters, excess_distance))
+
+                                # Append lap distance
+                                print('\t\t\t\t\t<DistanceMeters>',
+                                      file=outfile_obj)
+                                print('\t\t\t\t\t\t{:.1f}'.format(
+                                    LapDistanceMeters), file=outfile_obj)
+                                print('\t\t\t\t\t</DistanceMeters>',
+                                      file=outfile_obj)
+
+                                # Append dummy calorie data (value = 0)
+                                print('\t\t\t\t\t<Calories>',
+                                      file=outfile_obj)
+                                print('\t\t\t\t\t\t0', file=outfile_obj)
+                                print('\t\t\t\t\t</Calories>',
+                                      file=outfile_obj)
+
+                                # Append lap average HR tag
+                                print('\t\t\t\t\t<AverageHeartRateBpm xsi'
+                                      ':type="HeartRateInBeatsPerMinute_t">',
+                                      file=outfile_obj)
+                                print('\t\t\t\t\t\t<Value>', file=outfile_obj)
+                                print('\t\t\t\t\t\t\t{}.0'.format(
+                                    int(LapAverageHR)), file=outfile_obj)
+                                print('\t\t\t\t\t\t</Value>', file=outfile_obj)
+                                print('\t\t\t\t\t</AverageHeartRateBpm>',
+                                      file=outfile_obj)
+
+                                # Append lap maximum HR tag
+                                print('\t\t\t\t\t<MaximumHeartRateBpm xsi'
+                                      ':type="HeartRateInBeatsPerMinute_t">',
+                                      file=outfile_obj)
+                                print('\t\t\t\t\t\t<Value>', file=outfile_obj)
+                                print('\t\t\t\t\t\t\t{:.1f}'.format(
+                                    LapMaximumHR), file=outfile_obj)
+                                print('\t\t\t\t\t\t</Value>', file=outfile_obj)
+                                print('\t\t\t\t\t</MaximumHeartRateBpm>',
+                                      file=outfile_obj)
+
+                                # Write track tag to file
+                                print('\t\t\t\t<Track>', file=outfile_obj)
+
+                                # Add lap end tags and write buffer to file
+                                LapString += line
+                                # No need to append lap and track end tags 
+                                # if we have reached the end of the lap info
+                                if line.find('</Track>') < 0:
+                                    LapString += '\t\t\t\t</Track>\n'
+                                    LapString += '\t\t\t</Lap>\n'
+                                print(LapString, end="", file=outfile_obj)
+                                # print('Inside Loop Lap String: \n\t', end='')
+                                # print(LapString)
+
+                                # Reset lap flags and variables
+                                LapString = ""
+                                LapDistanceMeters = 0.0
+                                LapHRList = []
+
+                                found_lap_time = False
+                                found_something = False
+                                found_time = False
+                                found_heartrate = False
+                                found_distance = False
+                                search_dist_endtrackpt = False
+                                continue
+                    else:
+                        pass
+
+                    if search_dist_endtrackpt is False:
+                        found_something = False
+
+                LapString += line
+    if len(LapString) > 0:
+        print(LapString, end="", file=outfile_obj)
+        # print('Exit Loop Lap String: \n\t', end='')
+        # print(LapString)
+
+#         # TEST FILE WRITE CODE
+#         if(foundDistance):
+#             line = line.strip()
+#
+#             if(float(line) >= float(lapcount) * (splitresKM * 1000)):
+#                 lapcount += 1
+#                 # **Prints to file
+# #                print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
+#
+#             if len(args):
+#                 # **Prints to file
+# #               print(line.strip(), end=" ", file=outfile_obj)
+# #               print("progress = {}% actual progress = {:.1f}%".format(
+# #                   args[0].get(), percent), file=outfile_obj)
+#                 pass
+#             else:
+#                 print(line.strip())
+#             foundDistance = False
+#
+#         if(line.find('<Track>') >= 0):
+#             track = True
+#
+#         if(line.find('<DistanceMeters>') >= 0 and track):
+#             foundDistance = True
 
     que.put((int(percent), percent))
 #    print("loop done... line count={} queue={} percent ={}%".format(
