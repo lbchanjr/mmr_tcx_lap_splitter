@@ -372,41 +372,45 @@ def ParseLineInFile(file, splitresKM, *args):
                                 print('\t\t\t\t\t</Calories>',
                                       file=outfile_obj)
 
+                                # Write track tag to file
+                                print('\t\t\t\t<Track>', file=outfile_obj)
+
+                                print(LapString, end="", file=outfile_obj)
+                                print(line, end="", file=outfile_obj)
+
+                                if line.find('</Track>') < 0:
+                                    print('\t\t\t\t</Track>', file=outfile_obj)
+
                                 # Append lap average HR tag
-                                print('\t\t\t\t\t<AverageHeartRateBpm xsi'
-                                      ':type="HeartRateInBeatsPerMinute_t">',
+                                # print('\t\t\t\t\t<AverageHeartRateBpm xsi'
+                                #       ':type="HeartRateInBeatsPerMinute_t">',
+                                #       file=outfile_obj)
+                                print('\t\t\t\t\t<AverageHeartRateBpm>',
                                       file=outfile_obj)
+
                                 print('\t\t\t\t\t\t<Value>', file=outfile_obj)
-                                print('\t\t\t\t\t\t\t{}.0'.format(
+                                print('\t\t\t\t\t\t\t{}'.format(
                                     int(LapAverageHR)), file=outfile_obj)
                                 print('\t\t\t\t\t\t</Value>', file=outfile_obj)
                                 print('\t\t\t\t\t</AverageHeartRateBpm>',
                                       file=outfile_obj)
 
                                 # Append lap maximum HR tag
-                                print('\t\t\t\t\t<MaximumHeartRateBpm xsi'
-                                      ':type="HeartRateInBeatsPerMinute_t">',
+                                # print('\t\t\t\t\t<MaximumHeartRateBpm xsi'
+                                #       ':type="HeartRateInBeatsPerMinute_t">',
+                                #       file=outfile_obj)
+                                print('\t\t\t\t\t<MaximumHeartRateBpm>',
                                       file=outfile_obj)
                                 print('\t\t\t\t\t\t<Value>', file=outfile_obj)
-                                print('\t\t\t\t\t\t\t{:.1f}'.format(
-                                    LapMaximumHR), file=outfile_obj)
+                                print('\t\t\t\t\t\t\t{}'.format(
+                                    int(LapMaximumHR)), file=outfile_obj)
                                 print('\t\t\t\t\t\t</Value>', file=outfile_obj)
                                 print('\t\t\t\t\t</MaximumHeartRateBpm>',
                                       file=outfile_obj)
 
-                                # Write track tag to file
-                                print('\t\t\t\t<Track>', file=outfile_obj)
-
-                                # Add lap end tags and write buffer to file
-                                LapString += line
-                                # No need to append lap and track end tags
-                                # if we have reached the end of the lap info
+                                # Append lap end tags
                                 if line.find('</Track>') < 0:
-                                    LapString += '\t\t\t\t</Track>\n'
-                                    LapString += '\t\t\t</Lap>\n'
-                                print(LapString, end="", file=outfile_obj)
-                                # print('Inside Loop Lap String: \n\t', end='')
-                                # print(LapString)
+                                    print('\t\t\t</Lap>', file=outfile_obj)
 
                                 # Reset lap flags and variables
                                 LapString = ""
