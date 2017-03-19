@@ -271,6 +271,8 @@ def ParseLineInFile(file, splitresKM, *args):
                                 dt_obj[0] += '.000000'
                         currenttime_dtobj = datetime.strptime(
                             dt_obj[0], '%Y-%m-%dT%H:%M:%S.%f')
+                    #   line = '\t\t\t\t\t\t\t' + currenttime_dtobj.isoformat(
+                    #       timespec='seconds') + 'Z\n'
                     elif found_heartrate:
                         found_heartrate = False
                         LapHRList.append(int(line.strip()))
