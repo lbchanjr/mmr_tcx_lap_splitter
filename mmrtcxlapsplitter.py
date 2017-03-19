@@ -193,13 +193,10 @@ def ParseLineInFile(file, splitresKM, *args):
 
     global que
 
-    # **Prints to file
-#    print('Lap {} -->'.format(lapcount), end=" ", file=outfile_obj)
     for line in file_obj:
         # Perform enclosed operations only if progress bar is present
         if len(args):
             linetracker += 1
-     #       print('{}: {}'.format(linetracker, line), end='')
             percent = (linetracker / max_lines) * 100
 
             # Update queue only if the integer percent value has changed
@@ -212,7 +209,7 @@ def ParseLineInFile(file, splitresKM, *args):
             if line.find('<Lap StartTime') >= 0:
                 found_lap = True
             else:
-                print(line, end="", file=outfile_obj)
+                print(line.strip(), end="", file=outfile_obj)
         else:
             if found_track is False:
                 if line.find('<Track>') >= 0:
@@ -229,8 +226,8 @@ def ParseLineInFile(file, splitresKM, *args):
                         found_something = True
                         search_dist_endtrackpt = True
                     else:
-                        LapString += '\t\t</Activity>\n'
-                        LapString += '\t</Activities>\n'
+                        LapString += '</Activity>'
+                        LapString += '</Activities>'
                         LapString += '</TrainingCenterDatabase>'
                         break
 
@@ -252,13 +249,14 @@ def ParseLineInFile(file, splitresKM, *args):
                         if found_lap_time is False:
                             laptimelist = line.strip().split('.')
                             # Print Lap tag to file
-                            print('\t\t\t<Lap StartTime="{}+00:00">\n'.format(
+                            print('<Lap StartTime="{}+00:00">'.format(
                                 laptimelist[0]), end="", file=outfile_obj)
 
                             # Get lap start time and save as a datetime obj
                             dt_obj = line.strip().split('+')
                             if dt_obj[0].find('.') < 0:
                                 dt_obj[0] += '.000000'
+                                line = '+'.join(dt_obj)
                             starttime_dtobj = datetime.strptime(
                                 dt_obj[0], '%Y-%m-%dT%H:%M:%S.%f')
 
@@ -269,10 +267,11 @@ def ParseLineInFile(file, splitresKM, *args):
                             dt_obj = line.strip().split('+')
                             if dt_obj[0].find('.') < 0:
                                 dt_obj[0] += '.000000'
+                                line = '+'.join(dt_obj)
                         currenttime_dtobj = datetime.strptime(
                             dt_obj[0], '%Y-%m-%dT%H:%M:%S.%f')
-                    #   line = '\t\t\t\t\t\t\t' + currenttime_dtobj.isoformat(
-                    #       timespec='seconds') + 'Z\n'
+                    #   line = currenttime_dtobj.isoformat(
+                    #       timespec='seconds') + 'Z'
                     elif found_heartrate:
                         found_heartrate = False
                         LapHRList.append(int(line.strip()))
@@ -347,11 +346,12 @@ def ParseLineInFile(file, splitresKM, *args):
                                 # APPEND LAP SUMMARY DATA TO FILE
 
                                 # Append lap total time
-                                print('\t\t\t\t\t<TotalTimeSeconds>',
+                                print('<TotalTimeSeconds>', end='',
                                       file=outfile_obj)
-                                print('\t\t\t\t\t\t{:.1f}'.format(
-                                    LapTotalTimeSeconds), file=outfile_obj)
-                                print('\t\t\t\t\t</TotalTimeSeconds>',
+                                print('{:.1f}'.format(
+                                    LapTotalTimeSeconds), end='',
+                                    file=outfile_obj)
+                                print('</TotalTimeSeconds>', end='',
                                       file=outfile_obj)
 
                                 # Compensate for excess distance by adding it
@@ -360,59 +360,72 @@ def ParseLineInFile(file, splitresKM, *args):
                                     LapDistanceMeters += excess_distance
 
                                 # Append lap distance
-                                print('\t\t\t\t\t<DistanceMeters>',
+                                print('<DistanceMeters>', end='',
                                       file=outfile_obj)
-                                print('\t\t\t\t\t\t{:.1f}'.format(
-                                    LapDistanceMeters), file=outfile_obj)
-                                print('\t\t\t\t\t</DistanceMeters>',
+                                print('{:.1f}'.format(LapDistanceMeters),
+                                      end='', file=outfile_obj)
+                                print('</DistanceMeters>', end='',
                                       file=outfile_obj)
 
                                 # Append dummy calorie data (value = 0)
-                                print('\t\t\t\t\t<Calories>',
+                                print('<Calories>', end='',
                                       file=outfile_obj)
-                                print('\t\t\t\t\t\t0', file=outfile_obj)
-                                print('\t\t\t\t\t</Calories>',
+                                print('0', end='', file=outfile_obj)
+                                print('</Calories>', end='',
                                       file=outfile_obj)
 
                                 # Write track tag to file
-                                print('\t\t\t\t<Track>', file=outfile_obj)
+                                print('<Track>', end='', file=outfile_obj)
 
-                                print(LapString, end="", file=outfile_obj)
-                                print(line, end="", file=outfile_obj)
+                                time_only_idx = LapString.find(
+                                    '</Time></Trackpoint>')
+                                left_strlen = len(
+                                    '<Trackpoint><Time>2017-03-05T22:49:43.545000+00:00')
+                                right_strlen = len('</Time></Trackpoint>')
+
+                                while time_only_idx >= 0:
+#                                    print('time index = {}   Left = {}   Right = {}'.format(time_only_idx, LapString[time_only_idx-left_strlen-1], LapString[time_only_idx + right_strlen]))
+                                    LapString = LapString[:(time_only_idx - left_strlen)] + LapString[(
+                                        time_only_idx + right_strlen):]
+                                    time_only_idx = LapString.find('</Time></Trackpoint>')
+
+                                print(LapString, end='', file=outfile_obj)
+                                #print(LapString, end='\n**************************\n')
+                                print(line.strip(), end='', file=outfile_obj)
 
                                 if line.find('</Track>') < 0:
-                                    print('\t\t\t\t</Track>', file=outfile_obj)
+                                    print('</Track>', end='', file=outfile_obj)
 
                                 # Append lap average HR tag
                                 # print('\t\t\t\t\t<AverageHeartRateBpm xsi'
                                 #       ':type="HeartRateInBeatsPerMinute_t">',
                                 #       file=outfile_obj)
-                                print('\t\t\t\t\t<AverageHeartRateBpm>',
+                                print('<AverageHeartRateBpm>', end='',
                                       file=outfile_obj)
 
-                                print('\t\t\t\t\t\t<Value>', file=outfile_obj)
-                                print('\t\t\t\t\t\t\t{}'.format(
-                                    int(LapAverageHR)), file=outfile_obj)
-                                print('\t\t\t\t\t\t</Value>', file=outfile_obj)
-                                print('\t\t\t\t\t</AverageHeartRateBpm>',
+                                print('<Value>', end='', file=outfile_obj)
+                                print('{}'.format(int(LapAverageHR)), end='',
+                                      file=outfile_obj)
+                                print('</Value>', end='', file=outfile_obj)
+                                print('</AverageHeartRateBpm>', end='',
                                       file=outfile_obj)
 
                                 # Append lap maximum HR tag
                                 # print('\t\t\t\t\t<MaximumHeartRateBpm xsi'
                                 #       ':type="HeartRateInBeatsPerMinute_t">',
                                 #       file=outfile_obj)
-                                print('\t\t\t\t\t<MaximumHeartRateBpm>',
+                                print('<MaximumHeartRateBpm>', end='',
                                       file=outfile_obj)
-                                print('\t\t\t\t\t\t<Value>', file=outfile_obj)
-                                print('\t\t\t\t\t\t\t{}'.format(
-                                    int(LapMaximumHR)), file=outfile_obj)
-                                print('\t\t\t\t\t\t</Value>', file=outfile_obj)
-                                print('\t\t\t\t\t</MaximumHeartRateBpm>',
+                                print('<Value>', end='', file=outfile_obj)
+                                print('{}'.format(int(LapMaximumHR)), end='',
+                                      file=outfile_obj)
+                                print('</Value>', end='', file=outfile_obj)
+                                print('</MaximumHeartRateBpm>', end='',
                                       file=outfile_obj)
 
                                 # Append lap end tags
                                 if line.find('</Track>') < 0:
-                                    print('\t\t\t</Lap>', file=outfile_obj)
+                                    print('</Lap>', end='', file=outfile_obj)
 
                                 # Reset lap flags and variables
                                 LapString = ""
@@ -433,9 +446,9 @@ def ParseLineInFile(file, splitresKM, *args):
                     if search_dist_endtrackpt is False:
                         found_something = False
 
-                LapString += line
+                LapString += line.strip()
     if len(LapString) > 0:
-        print(LapString, end="", file=outfile_obj)
+        print(LapString.strip(), end="", file=outfile_obj)
         # print('Exit Loop Lap String: \n\t', end='')
         # print(LapString)
 
