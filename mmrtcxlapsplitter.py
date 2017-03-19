@@ -118,6 +118,12 @@ def ParseLineInFile(file, splitresKM, *args):
     bufstr = file_obj.read(50)
     file_obj.seek(0)        # reset file pointer to the beginning of file
     if bufstr.find('\x0a') < 0:
+        # Start indeterminate progress bar while converting the input file
+        global progressbar
+        progressbar.config(mode='indeterminate')
+        progressbar.start()
+        progressbar.update_idletasks()
+
         # file has no newline character, convert it to a
         # file that is delimited by newline for each tag and value
         bufstr = file_obj.read()
@@ -147,6 +153,11 @@ def ParseLineInFile(file, splitresKM, *args):
         max_lines = sum(buf.count(b'\n') for buf in fgen)
         outfile_obj.close()
 
+        # Stop indeterminate progress bar and switch mode to determinate
+        progressbar.stop()
+        progressbar.config(mode='determinate')
+        progressbar.update_idletasks()
+        
         #print(max_lines)
 
         # setup file object to read based on the newly created file
