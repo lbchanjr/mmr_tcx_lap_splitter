@@ -10,6 +10,7 @@ import queue
 from tkinter import *
 from tkinter import ttk
 from tkinter import filedialog
+from tkinter import messagebox
 
 from datetime import datetime
 
@@ -67,7 +68,7 @@ class TcxSplitSingleLap:
         while True:
             global que
             try:
-                progbar_per, actual_per = que.get_nowait()
+                queue_data = que.get_nowait()
             except queue.Empty:
                 if self.secondary_thread.is_alive() is True:
                     # if queue is empty, wait for another 1ms.
@@ -77,19 +78,30 @@ class TcxSplitSingleLap:
                 break
             else:  # continue from the try suite
 
-                self.progbarpercent.set(progbar_per)
-                label_percent.set('{}%'.format(progbar_per))
-#                print(actual_per)
-
-#                print("DEQUEUED! {}".format(self.progbarpercent.get()))
-                # if x == 4:
-                #     self.b_start['state'] = 'normal'
-                #     break
+                if type(queue_data) is tuple:
+                    progbar_per, actual_per = queue_data
+                    self.progbarpercent.set(progbar_per)
+                    label_percent.set('{}%'.format(progbar_per))
+#                    print('tuple dequeued: {}'.format(queue_data))
+                else:
+                    if queue_data == 0xAA:
+                        # Start indeterminate progress bar while converting
+                        # the input file
+                        self._progress.config(mode='indeterminate')
+                        self._progress.start()
+#                        print('progbar indeterminate started')
+                    else:
+                        # Stop indeterminate progress bar and switch mode to
+                        # determinate
+                        self._progress.stop()
+                        self._progress.config(mode='determinate')
+#                        print('progbar indeterminate stopped.. switch to determinate')
 
     def _callparseline(self):
         ParseLineInFile(self._filename, self._splitresKM,
                         self.progbarpercent, self.maxval)
         # ParseLineInFile(_f, self._splitresKM)
+
 
 def make_gen(reader):
     b = reader(1024 * 1024)
@@ -97,8 +109,11 @@ def make_gen(reader):
         yield b
         b = reader(1024 * 1024)
 
+
 # arg[0] = line count, arg[1] = max lines in file
 def ParseLineInFile(file, splitresKM, *args):
+
+    global que
 
     file_obj = open(file)
 
@@ -118,11 +133,10 @@ def ParseLineInFile(file, splitresKM, *args):
     bufstr = file_obj.read(50)
     file_obj.seek(0)        # reset file pointer to the beginning of file
     if bufstr.find('\x0a') < 0:
-        # Start indeterminate progress bar while converting the input file
-        global progressbar
-        progressbar.config(mode='indeterminate')
-        progressbar.start()
-        progressbar.update_idletasks()
+
+        # Tell queue checker to start progress bar in indeterminate mode
+        que.put(0xAA)
+#       print('start indeterminate progbar')
 
         # file has no newline character, convert it to a
         # file that is delimited by newline for each tag and value
@@ -153,11 +167,11 @@ def ParseLineInFile(file, splitresKM, *args):
         max_lines = sum(buf.count(b'\n') for buf in fgen)
         outfile_obj.close()
 
-        # Stop indeterminate progress bar and switch mode to determinate
-        progressbar.stop()
-        progressbar.config(mode='determinate')
-        progressbar.update_idletasks()
-        
+        # Tell queue checker to stop indeterminate progress bar
+        # and switch it to determinate mode.
+        que.put(0x55)
+#        print('stop indeterminate progbar')
+
         #print(max_lines)
 
         # setup file object to read based on the newly created file
@@ -195,14 +209,12 @@ def ParseLineInFile(file, splitresKM, *args):
     # # TEST WRITE FLAGS
     # foundDistance = False
     # track = False
-    # lapcount = 1
+    lapcount = 1
 
     # PROGRESS BAR VARIABLES
     # tracks if the same percent integer value has been calculated
     lastpercent = 0
     linetracker = 0   # tracks the number of lines within the file
-
-    global que
 
     for line in file_obj:
         # Perform enclosed operations only if progress bar is present
@@ -337,6 +349,9 @@ def ParseLineInFile(file, splitresKM, *args):
                         else:
                             if (line.find('</Trackpoint>') >= 0) or (
                                line.find('</Track>') >= 0):
+                                # Increment lap counter
+                                lapcount += 1
+
                                 # Calculate Lap start time and current time
                                 # delta and convert to seconds
                                 timedelta = currenttime_dtobj - starttime_dtobj
@@ -492,6 +507,12 @@ def ParseLineInFile(file, splitresKM, *args):
     que.put((int(percent), percent))
 #    print("loop done... line count={} queue={} percent ={}%".format(
 #        linetracker, que, percent))
+
+    # display message box indicating that operation is finished
+    if __name__ == "__main__":
+        messagebox.showinfo(
+            'MapMyRun TCX Lap Splitter', '{} created.\n{} laps were extracted.'.format(
+            outfile_obj.name, lapcount-1))
 
     file_obj.close()
     outfile_obj.close()
