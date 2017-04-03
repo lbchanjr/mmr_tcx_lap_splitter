@@ -350,11 +350,13 @@ def ParseLineInFile(file, splitresKM, *args):
                                     LapTotalTimeSeconds = (
                                         timedelta.total_seconds() - (
                                             delta_time))
-                                # Get max HR for the lap
-                                LapMaximumHR = float(max(LapHRList))
-                                # Compute average HR for the lap
-                                LapAverageHR = float(sum(LapHRList)) / max(
-                                    len(LapHRList), 1)
+
+                                if len(LapHRList) != 0:
+                                    # Get max HR for the lap
+                                    LapMaximumHR = float(max(LapHRList))
+                                    # Compute average HR for the lap
+                                    LapAverageHR = float(sum(LapHRList)) / max(
+                                        len(LapHRList), 1)
 
                                 # APPEND LAP SUMMARY DATA TO FILE
 
@@ -409,32 +411,33 @@ def ParseLineInFile(file, splitresKM, *args):
                                 if line.find('</Track>') < 0:
                                     print('</Track>', end='', file=outfile_obj)
 
-                                # Append lap average HR tag
-                                # print('\t\t\t\t\t<AverageHeartRateBpm xsi'
-                                #       ':type="HeartRateInBeatsPerMinute_t">',
-                                #       file=outfile_obj)
-                                print('<AverageHeartRateBpm>', end='',
-                                      file=outfile_obj)
+                                if len(LapHRList) != 0:
+                                    # Append lap average HR tag
+                                    # print('\t\t\t\t\t<AverageHeartRateBpm xsi'
+                                    #       ':type="HeartRateInBeatsPerMinute_t">',
+                                    #       file=outfile_obj)
+                                    print('<AverageHeartRateBpm>', end='',
+                                          file=outfile_obj)
 
-                                print('<Value>', end='', file=outfile_obj)
-                                print('{}'.format(int(LapAverageHR)), end='',
-                                      file=outfile_obj)
-                                print('</Value>', end='', file=outfile_obj)
-                                print('</AverageHeartRateBpm>', end='',
-                                      file=outfile_obj)
+                                    print('<Value>', end='', file=outfile_obj)
+                                    print('{}'.format(int(LapAverageHR)), end='',
+                                          file=outfile_obj)
+                                    print('</Value>', end='', file=outfile_obj)
+                                    print('</AverageHeartRateBpm>', end='',
+                                          file=outfile_obj)
 
-                                # Append lap maximum HR tag
-                                # print('\t\t\t\t\t<MaximumHeartRateBpm xsi'
-                                #       ':type="HeartRateInBeatsPerMinute_t">',
-                                #       file=outfile_obj)
-                                print('<MaximumHeartRateBpm>', end='',
-                                      file=outfile_obj)
-                                print('<Value>', end='', file=outfile_obj)
-                                print('{}'.format(int(LapMaximumHR)), end='',
-                                      file=outfile_obj)
-                                print('</Value>', end='', file=outfile_obj)
-                                print('</MaximumHeartRateBpm>', end='',
-                                      file=outfile_obj)
+                                    # Append lap maximum HR tag
+                                    # print('\t\t\t\t\t<MaximumHeartRateBpm xsi'
+                                    #       ':type="HeartRateInBeatsPerMinute_t">',
+                                    #       file=outfile_obj)
+                                    print('<MaximumHeartRateBpm>', end='',
+                                          file=outfile_obj)
+                                    print('<Value>', end='', file=outfile_obj)
+                                    print('{}'.format(int(LapMaximumHR)), end='',
+                                          file=outfile_obj)
+                                    print('</Value>', end='', file=outfile_obj)
+                                    print('</MaximumHeartRateBpm>', end='',
+                                          file=outfile_obj)
 
                                 # Append lap end tags
                                 if line.find('</Track>') < 0:
