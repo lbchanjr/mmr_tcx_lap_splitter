@@ -115,6 +115,8 @@ def ParseLineInFile(file, splitresKM, *args):
 
     global que
 
+    close_file = True
+
     file_obj = open(file)
 
     # make a copy of the line count for the file
@@ -133,49 +135,80 @@ def ParseLineInFile(file, splitresKM, *args):
     bufstr = file_obj.read(50)
     file_obj.seek(0)        # reset file pointer to the beginning of file
     if bufstr.find('\x0a') < 0:
-
-        # Tell queue checker to start progress bar in indeterminate mode
-        que.put(0xAA)
-#       print('start indeterminate progbar')
-
         # file has no newline character, convert it to a
         # file that is delimited by newline for each tag and value
         bufstr = file_obj.read()
-        bufstr = bufstr.replace('>', '>\x0a')
-        cur_index = 0
-        while cur_index >= 0:
-            cur_index = bufstr.find('</', cur_index)
-            if cur_index >= 0:
-                if bufstr[cur_index - 1].isdigit() is True:
-                    bufstr = bufstr[:cur_index] + '\x0a' + bufstr[cur_index:]
-                    cur_index += 2
-                else:
-                    cur_index += 1
+
+#       /////////////////////////////////////////
+        close_file = False
 
         file_obj.close()
 
-        # Write buffer to temp file that will be worked on
-        outf = outfilename.split('-split')
-        outf[len(outf) - 2] = outf[len(outf) - 2] + '-linesep'
-        newfilename = outf[len(outf) - 2] + '.tcx'
-        outfile_obj = open(newfilename, mode='w', newline='\n')
-        outfile_obj.write(bufstr)
-        outfile_obj.close()
+        file_obj = bufstr.split('>')
 
-        outfile_obj = open(newfilename, 'rb')
-        fgen = make_gen(outfile_obj.raw.read)
-        max_lines = sum(buf.count(b'\n') for buf in fgen)
-        outfile_obj.close()
+        buf_index = 0
+        max_lines = len(file_obj)
+        while buf_index < max_lines:
+            find_res = file_obj[buf_index].find('<')
+            if find_res == 0:
+                file_obj[buf_index] = file_obj[buf_index] + '>'
+            elif find_res > 0:
+                sub_split = file_obj[buf_index].split('<')
+                # print(sub_split)
+                file_obj[buf_index] = sub_split[0]
+                buf_index += 1
+                file_obj.insert(buf_index, '<' + sub_split[1] + '>')
+                max_lines += 1
+            buf_index += 1
 
-        # Tell queue checker to stop indeterminate progress bar
-        # and switch it to determinate mode.
-        que.put(0x55)
-#        print('stop indeterminate progbar')
+        # for x in file_obj:
+        #     print(x)
 
-        #print(max_lines)
+        # print("---end---")
 
-        # setup file object to read based on the newly created file
-        file_obj = open(newfilename)
+#       /////////////////////////////////////////
+#       //////////////////////////////
+#         # Tell queue checker to start progress bar in indeterminate mode
+#         que.put(0xAA)
+# #       print('start indeterminate progbar')
+
+        # bufstr = bufstr.replace('>', '>\x0a')
+        # cur_index = 0
+        # while cur_index >= 0:
+        #     cur_index = bufstr.find('</', cur_index)
+        #     if cur_index >= 0:
+        #         if bufstr[cur_index - 1].isdigit() is True:
+        #             bufstr = bufstr[:cur_index] + '\x0a' + bufstr[cur_index:]
+        #             cur_index += 2
+        #         else:
+        #             cur_index += 1
+
+        # file_obj.close()
+
+        # # Write buffer to temp file that will be worked on
+        # outf = outfilename.split('-split')
+        # outf[len(outf) - 2] = outf[len(outf) - 2] + '-linesep'
+        # newfilename = outf[len(outf) - 2] + '.tcx'
+        # outfile_obj = open(newfilename, mode='w', newline='\n')
+        # outfile_obj.write(bufstr)
+        # outfile_obj.close()
+
+        # outfile_obj = open(newfilename, 'rb')
+        # fgen = make_gen(outfile_obj.raw.read)
+        # max_lines = sum(buf.count(b'\n') for buf in fgen)
+        # outfile_obj.close()
+
+        # #print(max_lines)
+
+        # # setup file object to read based on the newly created file
+        # file_obj = open(newfilename)
+
+#         # Tell queue checker to stop indeterminate progress bar
+#         # and switch it to determinate mode.
+#         que.put(0x55)
+# #        print('stop indeterminate progbar')
+
+#       //////////////////////////////////
 
 #        print(file_obj)
     # open output file
@@ -514,7 +547,9 @@ def ParseLineInFile(file, splitresKM, *args):
             'MapMyRun TCX Lap Splitter', '{} created.\n{} laps were extracted.'.format(
             outfile_obj.name, lapcount-1))
 
-    file_obj.close()
+    if close_file is True:
+        file_obj.close()
+
     outfile_obj.close()
 
 
