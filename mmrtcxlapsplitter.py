@@ -139,7 +139,6 @@ def ParseLineInFile(file, splitresKM, *args):
         # file that is delimited by newline for each tag and value
         bufstr = file_obj.read()
 
-#       /////////////////////////////////////////
         close_file = False
 
         file_obj.close()
@@ -166,51 +165,6 @@ def ParseLineInFile(file, splitresKM, *args):
 
         # print("---end---")
 
-#       /////////////////////////////////////////
-#       //////////////////////////////
-#         # Tell queue checker to start progress bar in indeterminate mode
-#         que.put(0xAA)
-# #       print('start indeterminate progbar')
-
-        # bufstr = bufstr.replace('>', '>\x0a')
-        # cur_index = 0
-        # while cur_index >= 0:
-        #     cur_index = bufstr.find('</', cur_index)
-        #     if cur_index >= 0:
-        #         if bufstr[cur_index - 1].isdigit() is True:
-        #             bufstr = bufstr[:cur_index] + '\x0a' + bufstr[cur_index:]
-        #             cur_index += 2
-        #         else:
-        #             cur_index += 1
-
-        # file_obj.close()
-
-        # # Write buffer to temp file that will be worked on
-        # outf = outfilename.split('-split')
-        # outf[len(outf) - 2] = outf[len(outf) - 2] + '-linesep'
-        # newfilename = outf[len(outf) - 2] + '.tcx'
-        # outfile_obj = open(newfilename, mode='w', newline='\n')
-        # outfile_obj.write(bufstr)
-        # outfile_obj.close()
-
-        # outfile_obj = open(newfilename, 'rb')
-        # fgen = make_gen(outfile_obj.raw.read)
-        # max_lines = sum(buf.count(b'\n') for buf in fgen)
-        # outfile_obj.close()
-
-        # #print(max_lines)
-
-        # # setup file object to read based on the newly created file
-        # file_obj = open(newfilename)
-
-#         # Tell queue checker to stop indeterminate progress bar
-#         # and switch it to determinate mode.
-#         que.put(0x55)
-# #        print('stop indeterminate progbar')
-
-#       //////////////////////////////////
-
-#        print(file_obj)
     # open output file
     outfile_obj = open(outfilename, mode='w', newline='\n')
 #    print(outfilename, outfile_obj)
