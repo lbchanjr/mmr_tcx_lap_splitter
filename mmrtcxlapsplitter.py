@@ -412,7 +412,7 @@ def ParseLineInFile(file, splitresKM, *args):
                                 if line.find('</Track>') < 0:
                                     print('</Track>', end='', file=outfile_obj)
 
-                                # Check if HR list is empty
+                                # Check if HR list is not empty
                                 if LapHRList:
                                     # Append lap average HR tag
                                     # print('\t\t\t\t\t<AverageHeartRateBpm xsi'
