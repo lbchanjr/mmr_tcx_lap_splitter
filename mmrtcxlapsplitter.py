@@ -351,7 +351,8 @@ def ParseLineInFile(file, splitresKM, *args):
                                         timedelta.total_seconds() - (
                                             delta_time))
 
-                                if len(LapHRList) != 0:
+                                # check if HR list is not empty
+                                if LapHRList:
                                     # Get max HR for the lap
                                     LapMaximumHR = float(max(LapHRList))
                                     # Compute average HR for the lap
@@ -411,7 +412,8 @@ def ParseLineInFile(file, splitresKM, *args):
                                 if line.find('</Track>') < 0:
                                     print('</Track>', end='', file=outfile_obj)
 
-                                if len(LapHRList) != 0:
+                                # Check if HR list is empty
+                                if LapHRList:
                                     # Append lap average HR tag
                                     # print('\t\t\t\t\t<AverageHeartRateBpm xsi'
                                     #       ':type="HeartRateInBeatsPerMinute_t">',
