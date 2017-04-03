@@ -7,7 +7,7 @@ the laps to be splitted.
 
 * Quick summary
 * Version
-v0.0.1-alpha1
+v0.0.4-beta2
 * [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
 
 ### How do I get set up? ###
