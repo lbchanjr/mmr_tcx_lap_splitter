@@ -24,7 +24,7 @@ v0.0.4-beta2
 3.) Specify the lap distance to split the workout into by moving the slide bar beside "Split every:".  
 4.) Select the exported MapMyRun tcx file by clicking on "Select File...".  
 5.) Choose the TCX file on the file open dialog box and click "Open".  
-6.) In the same directory where the selected file was contained, a new file name with the same filename+"-split".tcx will be created. For example, if you input a MapMyRun TCX file named "abcde.tcx", the output file created by the script will be named as "abcde-split.tcx" and will be created on the same directory where "abcde.tcx" is contained.
+6.) In the same directory where the selected file was contained, a new file name with the same filename+"-split".tcx will be created.   For example, if you input a MapMyRun TCX file named "abcde.tcx", the output file created by the script will be named as "abcde-split.tcx" and will be created on the same directory where "abcde.tcx" is contained.  
 7.) This filename is the new TCX file that was split according to the lap distance that you specified and can now be imported to other fitness accounts such as Garmin Connect or Strava.  
 
 ### Who do I talk to? ###  
