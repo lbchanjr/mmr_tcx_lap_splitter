@@ -30,5 +30,5 @@ v0.0.4-beta2
 ### Who do I talk to? ###  
 
 * Repo owner or admin  
-Louise Chan
+Louise Chan  
 For any questions, bug reports or improvement suggestions you may email me at: lbchan525@gmail.com
