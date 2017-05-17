@@ -1,6 +1,6 @@
 # MapMyRun TCX Lap Splitter (mmrtcxlapsplitter.py) #
 
-A tool used to convert a single-lap TCX file exported using MapMyRun into a TCX file containing multiple laps spit according to how the user would want
+A tool for converting a single-lap TCX file exported using MapMyRun into a TCX file containing multiple laps spit according to how the user would want
 the laps to be splitted.
 
 ### What is this repository for? ###
