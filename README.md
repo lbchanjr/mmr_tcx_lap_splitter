@@ -17,7 +17,7 @@ v0.0.4-beta2
 ### How do I get set up? ###
 
 * Summary of set up  
-1.) Requires Python 3.
+1.) Requires Python 3 and Tcl/Tk for the stand-alone UI.
 * Configuration  
 1.) Install Python 3 on your computer.  
 2.) Run script by typing 'python mmrtcxlapsplitter.py' on the command prompt.  
