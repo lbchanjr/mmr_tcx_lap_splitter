@@ -32,4 +32,4 @@ v0.0.4-beta2
 
 * Repo owner or admin  
 Louise Chan Jr.   
-For any questions, bug reports or improvement suggestions, you submit an entry in the Issues tab.
+For any questions, bug reports or improvement suggestions, you may submit an entry in the Issues tab.
